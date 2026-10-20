@@ -36,7 +36,8 @@ sl_3rdparty() {
 
 sl_get_webui() {
     s3_path="$GIT_BRANCH/$version_t"
-    wget https://download.studio.link/devel/$s3_path/webui.zip
+    # wget https://download.studio.link/devel/$s3_path/webui.zip
+    wget -c "https://download.studio.link/devel/v21.xx.x/v21.12.0-beta-9a6f85b/webui.zip"
     unzip webui.zip
     mkdir -p ../src/modules/webapp/assets
     cp -a webui/headers/*.h ../src/modules/webapp/assets/
@@ -51,6 +52,11 @@ sl_get_overlay-vst() {
     unzip -q $vstsdk.zip
     mv VST_SDK/VST2_SDK overlay-vst/vstsdk2.4
     if [ "$BUILD_TARGET" == "linux" ]; then
+        pushd overlay-vst/vstsdk2.4
+        patch --ignore-whitespace -p1 < ../vst2_linux.patch
+        popd
+    fi
+    if [ "$BUILD_TARGET" == "linux_arm64" ]; then
         pushd overlay-vst/vstsdk2.4
         patch --ignore-whitespace -p1 < ../vst2_linux.patch
         popd

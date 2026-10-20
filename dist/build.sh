@@ -37,6 +37,10 @@ fi
 if [ "$BUILD_TARGET" == "linux" ]; then
     sl_extra_modules="alsa slaudio"
 fi
+if [ "$BUILD_TARGET" == "linux_arm64" ]; then
+    sl_extra_modules="alsa slaudio"
+    export ARCH="arm64"
+fi
 if [ "$BUILD_TARGET" == "linuxjack" ]; then
     sl_extra_modules="jack alsa slaudio"
 fi
@@ -93,7 +97,7 @@ if [ ! -d baresip-$baresip ]; then
 
     pushd baresip-$baresip
     # Standalone
-    if [ "$BUILD_TARGET" == "linux" ] || [ "$BUILD_TARGET" == "linuxjack" ]; then
+    if [ "$BUILD_TARGET" == "linux" ] || [ "$BUILD_TARGET" == "linuxjack" ] || [ "$BUILD_TARGET" == "linux_arm64" ]; then
         make $debug $make_opts $use_ssl  LIBRE_SO=../re LIBREM_PATH=../rem STATIC=1 \
             MODULES="opus stdio ice g711 turn stun uuid auloop webapp $sl_extra_modules" \
             EXTRA_CFLAGS="-I ../my_include $sl_extra_cflags" \
@@ -136,6 +140,13 @@ if [ "$BUILD_TARGET" == "linux" ]; then
     fi
 fi
 
+if [ "$BUILD_TARGET" == "linux_arm64" ]; then
+    if [ ! -d overlay-lv2 ]; then
+        git clone $github_org/overlay-lv2.git overlay-lv2
+        cd overlay-lv2; ./build.sh; cd ..
+    fi
+fi
+
 # Build overlay-onair-lv2 plugin (linux only)
 #-----------------------------------------------------------------------------
 if [ "$BUILD_TARGET" == "linux" ]; then
@@ -145,9 +156,27 @@ if [ "$BUILD_TARGET" == "linux" ]; then
     fi
 fi
 
+if [ "$BUILD_TARGET" == "linux_arm64" ]; then
+    if [ ! -d overlay-onair-lv2 ]; then
+        git clone $github_org/overlay-onair-lv2.git overlay-onair-lv2
+        cd overlay-onair-lv2; ./build.sh; cd ..
+    fi
+fi
+
 # Build Reaper Linux overlay-vst
 #-----------------------------------------------------------------------------
 if [ "$BUILD_TARGET" == "linux" ]; then
+    if [ ! -d overlay-vst ]; then
+        sl_get_overlay-vst
+        pushd overlay-vst
+        rm Makefile
+        mv Makefile.linux Makefile
+        make
+        popd
+    fi
+fi
+
+if [ "$BUILD_TARGET" == "linux_arm64" ]; then
     if [ ! -d overlay-vst ]; then
         sl_get_overlay-vst
         pushd overlay-vst
@@ -246,6 +275,43 @@ if [ "$BUILD_TARGET" == "linuxjack" ]; then
 fi
 
 if [ "$BUILD_TARGET" == "linux" ]; then
+    #./studio-link-standalone -t 5
+    ldd studio-link-standalone
+
+    strip --strip-all studio-link-standalone
+    strip --strip-all overlay-lv2/studio-link.so
+    strip --strip-all overlay-onair-lv2/studio-link-onair.so
+
+    chmod +x studio-link-standalone 
+    mv studio-link-standalone studio-link-standalone-$version_tc
+    tar -cvzf studio-link-standalone-$version_tc.tar.gz studio-link-standalone-$version_tc
+
+    mkdir -p studio-link.lv2
+    cp -a overlay-lv2/studio-link.so studio-link.lv2/
+    cp -a overlay-lv2/*.ttl studio-link.lv2/
+    cp -a overlay-lv2/README.md studio-link.lv2/
+    zip -r studio-link-plugin studio-link.lv2
+
+    mkdir -p studio-link-onair.lv2
+    cp -a overlay-onair-lv2/studio-link-onair.so studio-link-onair.lv2/
+    cp -a overlay-onair-lv2/*.ttl studio-link-onair.lv2/
+    cp -a overlay-onair-lv2/README.md studio-link-onair.lv2/
+    zip -r studio-link-plugin-onair studio-link-onair.lv2
+
+    mkdir -p vst
+    pushd vst
+    cp ../overlay-vst/studio-link.so .
+    zip studio-link-plugin.zip studio-link.so
+    rm studio-link.so
+    popd
+
+    cp -a studio-link-standalone-$version_tc.tar.gz $s3_path
+    cp -a studio-link-plugin.zip $s3_path
+    cp -a studio-link-plugin-onair.zip $s3_path
+    cp -a vst $s3_path
+fi
+
+if [ "$BUILD_TARGET" == "linux_arm64" ]; then
     #./studio-link-standalone -t 5
     ldd studio-link-standalone
 
